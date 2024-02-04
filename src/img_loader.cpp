@@ -138,7 +138,7 @@ namespace img_loader {
         // now ptr contains extension name
         std::string ext = std::string(ptr);
 
-        if (ext == "jpg" || ext == "jpeg" || ext == "jpe" || ext == "jif" || ext == "jfif") return _EXT_JPG;
+        if (ext == "jpg" || ext == "jpeg" || ext == "jpe" || ext == "jfif") return _EXT_JPG;
         else if (ext == "png") return _EXT_PNG;
         else if (ext == "bmp" || ext == "dib") return _EXT_BMP;
         else return _EXT_UNKNOWN;
