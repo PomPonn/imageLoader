@@ -1,8 +1,9 @@
 #pragma once
 
 namespace img_loader {
-    typedef unsigned char uword_t;
-    typedef unsigned char byte_t;
+    typedef unsigned int uint;
+    typedef unsigned short ushort;
+    typedef unsigned char byte;
 
     /// <COMMON> ///
 
@@ -27,51 +28,88 @@ namespace img_loader {
         PNG_PLTE = 0x504C5445, // image palette
     };
     struct _png_chunk {
-        uword_t data_length;
-        uword_t type;
+        uint data_length;
+        uint type;
         void* data;
-        uword_t CRC; // Cyclic Redundancy Check
+        uint CRC; // Cyclic Redundancy Check
 
         bool isEmpty() { return data == nullptr; }
     };
     struct _png_header_chunk_data {
-        uword_t img_width;
-        uword_t img_height;
-        byte_t bit_depth;
-        byte_t color_type;
+        uint img_width;
+        uint img_height;
+        byte bit_depth;
+        byte color_type;
         // compression method
-        byte_t compr_method;
-        byte_t filter_method;
-        byte_t interlace_method;
+        byte compr_method;
+        byte filter_method;
+        byte interlace_method;
 
-        _png_header_chunk_data(const byte_t* data);
+        _png_header_chunk_data(const byte* data);
     };
     struct _png_palette_chunk_data {
         // contains from 1 to 256 entries
         // 3 bytes per entry -> R G B
-        byte_t* entries;
+        byte* entries;
 
-        _png_palette_chunk_data(const byte_t* data);
+        _png_palette_chunk_data(const byte* data);
     };
     struct _png_data_chunk_data {
-        byte_t* compressed_data;
+        byte* compressed_data;
 
-        _png_data_chunk_data(const byte_t* data);
+        _png_data_chunk_data(const byte* data);
     };
 
-    static _png_chunk* _load_png_chunk(const byte_t* data);
+    _png_chunk* _load_png_chunk(const byte* data);
 
     /// </PNG> ///
 
     /// <BMP> ///
 
-
+    struct _bmp_info_header {
+        uint header_size; // 40
+        uint width; // image width
+        uint height; // image height
+        ushort planes; // 1
+        /*
+        Bits per pixel
+        1 = monochrome palette, num_colors = 1
+        4 = 4bit palletized, num_colors = 16
+        8 = 8bit palletized, num_colors = 256
+        16 = 16bit RGB, num_colors = 56636 (?)
+        24 = 24bit RGB, num_colors = 16M
+        */
+        ushort bit_count;
+        /*
+        0 = BI_RGB - no compression
+        1 = BI_RLE8 - 8bit RLE encoding
+        2 = BI_RLE4 - 4bit RLE encoding
+        */
+        uint compression;
+        uint image_size;
+        uint x_pixels_per_m;
+        uint y_pixels_per_m;
+        // palette related information
+        uint colors_used;
+        uint colors_important; // 0 = all
+    };
+    // present only when bit_count <= 8
+    struct _bmp_color_table {
+        ushort size; // always bit_count ^ 2
+        // 1 byte for each component - R G B and 1 reserved byte
+        uint* colors;
+    };
 
     /// </BMP> ///
 
     /// <PUBLIC> ///
 
-    static unsigned char* load(const char* file_path, int& width, int& height);
+    /// @brief loads given file into array of bytes
+    /// @param file_path path to the file
+    /// @param width returns width of the file
+    /// @param height returns height of the file
+    /// @return pointer to the raw image data
+    byte* load(const char* file_path, int& width, int& height);
 
     /// </PUBLIC> ///
 };
