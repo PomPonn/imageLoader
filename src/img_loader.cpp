@@ -2,15 +2,13 @@
 
 #include "indian.hpp"
 
-#include <fstream>
 #include <iostream>
 #include <cmath>
 
-#define __PNG_POINT_NEXT_CHUNK(ptr, data_length) ptr += data_length + 12
+#define PNG_POINT_NEXT_CHUNK(ptr, data_length) ptr += data_length + 12
 
 namespace img_loader {
 
-    // struct constructors
     _png_header_chunk_data::_png_header_chunk_data(const byte* data) {
         img_width = *(uint*)reverse_indianness(4, (void*)data);
         img_height = *(uint*)reverse_indianness(4, (void*)(data + 4));
@@ -20,11 +18,22 @@ namespace img_loader {
         filter_method = *(byte*)reverse_indianness(4, (void*)(data + 8));
         interlace_method = *(byte*)reverse_indianness(4, (void*)(data + 9));
     }
+
     _png_palette_chunk_data::_png_palette_chunk_data(const byte* data) {
         entries = (byte*)data;
     }
+
     _png_data_chunk_data::_png_data_chunk_data(const byte* data) {
         compressed_data = (byte*)data;
+    }
+
+    byte* _read_file_block(std::ifstream& file, std::streamsize count) {
+        byte* buffer = new byte[count];
+        file.read((char*)buffer, count);
+        if (file.fail()) {
+            return nullptr;
+        }
+        return buffer;
     }
 
     _png_chunk* _load_png_chunk(const byte* data) {
@@ -72,12 +81,96 @@ namespace img_loader {
         return chunk;
     }
 
+    byte* _load_bitmap(std::ifstream& file, int& width, int& height) {
+        byte* buffer = nullptr;
+
+        // skip file header, since its unnecessary to read
+        file.seekg(10);
+
+        // read image data offset & header size
+        buffer = _read_file_block(file, 8);
+        uint data_offset = *(uint*)buffer;
+        uint header_size = *(uint*)(buffer + 4);
+        delete[] buffer;
+
+        // info header
+        if (header_size == 40) {
+            // read info header
+            buffer = _read_file_block(file, sizeof(_bmp_info_header));
+            _bmp_info_header info_header = *(_bmp_info_header*)buffer;
+            delete[] buffer;
+
+            width = info_header.width;
+            height = info_header.height;
+
+            // color table
+            if (info_header.bit_count <= 8 && info_header.compression == 0) {
+                _bmp_color_table color_table;
+
+                if (info_header.colors_used == 0) {
+                    color_table.size = (uint)pow(2, info_header.bit_count);
+                }
+                else {
+                    color_table.size = info_header.colors_used;
+                }
+
+                buffer = _read_file_block(file, color_table.size * sizeof(rgb_quad));
+                color_table.colors = (rgb_quad*)buffer;
+                delete[] buffer;
+
+                // TODO: FINISH
+                std::cout << "{LOG} IMG_LOADER::color table used";
+            }
+            // bit fields
+            else if (info_header.compression == 3) {
+                // read bit fields
+                buffer = _read_file_block(file, sizeof(_bmp_color_masks));
+                _bmp_color_masks color_masks = *(_bmp_color_masks*)buffer;
+                delete[] buffer;
+
+                // TODO: FINISH
+                std::cout << "{LOG} IMG_LOADER::bit fields used: "
+                    << color_masks.red << " "
+                    << color_masks.green << " "
+                    << color_masks.blue << std::endl;
+            }
+            // uncompressed data
+            else if (info_header.compression == 0) {
+                buffer = _read_file_block(file, width * height * 3);
+            }
+            else {
+                std::cerr << "IMG_LOADER::BMP::UNSUPPORTED_FILE_STRUCTURE" << std::endl;
+                return nullptr;
+            }
+        }
+        // v5 header
+        else if (header_size == 124) {
+            buffer = _read_file_block(file, sizeof(_bmp_v5_header));
+            _bmp_v5_header v5_header = *(_bmp_v5_header*)buffer;
+            delete[] buffer;
+            // uncompressed data
+            if (v5_header.bit_count == 24 && v5_header.compression == 0) {
+                buffer = _read_file_block(file, width * height);
+            }
+            else {
+                //TODO: FINISH
+            }
+        }
+        // old headers
+        else {
+            std::cerr << "IMG_LOADER::BMP::UNSUPPORTED_FILE_STRUCTURE" << std::endl;
+            return nullptr;
+        }
+
+        return buffer;
+    }
+
     byte* load(const char* file_path, int& width, int& height)
     {
         std::ifstream file(file_path, std::ios::binary | std::ios::in);
 
         if (file.fail()) {
-            std::cout << "IMG_LOADER::OPEN_FILE::FAIL -> " << file_path << std::endl;
+            std::cerr << "IMG_LOADER::OPEN_FILE::FAIL: " << file_path << std::endl;
             return nullptr;
         }
         else {
@@ -85,74 +178,47 @@ namespace img_loader {
 
             // if extension is unknown
             if (!ext) {
-                std::cout << "IMG_LOADER::OPEN_FILE::UNSUPPORTED_EXTENSION -> " << file_path << std::endl;
+                std::cerr << "IMG_LOADER::OPEN_FILE::UNKNOWN_FORMAT: " << file_path << std::endl;
                 return nullptr;
             }
 
-            // get file length
-            file.seekg(0, file.end);
-            size_t length = (size_t)file.tellg();
-            file.seekg(0, file.beg);
-
-            // read whole file to the buffer
-            unsigned char* buffer = new unsigned char[length];
-            file.read((char*)buffer, length);
-
-            byte* curr_byte = nullptr;
             switch (ext)
             {
             case _EXT_BMP: {
-                // skip file header, since its unnecessary to read
-                curr_byte = (byte*)(buffer + 10);
-                // read offset to pixel array after header
-                uint data_offset = *(uint*)curr_byte;
-                curr_byte += 4;
-
-                _bmp_info_header* info_header = (_bmp_info_header*)curr_byte;
-                curr_byte += info_header->header_size;
-
-                width = info_header->width;
-                height = info_header->height;
-
-                // check whether color table should appear next
-                if (info_header->bit_count <= 8) {
-                    _bmp_color_table* color_table = new _bmp_color_table;
-                    color_table->size = (ushort)pow(info_header->bit_count, 2);
-                    color_table->colors = (uint*)curr_byte;
-                    curr_byte += color_table->size;
-
-                    byte* img_data = (byte*)curr_byte;
-                }
-                else {
-                    return (byte*)curr_byte;
-                }
-
-                break;
+                return _load_bitmap(file, width, height);
             }
             case _EXT_PNG: {
+                byte* buffer = nullptr;
                 /*
                     FINISH THIS
                 */
                 // skip PNG marker (8 bytes)
-                curr_byte = (byte*)(buffer + 8);
+                byte* curr_byte = (byte*)(buffer + 8);
 
                 _png_chunk* IHDR = _load_png_chunk(curr_byte);
-                __PNG_POINT_NEXT_CHUNK(curr_byte, IHDR->data_length);
+                PNG_POINT_NEXT_CHUNK(curr_byte, IHDR->data_length);
                 _png_chunk* sec = _load_png_chunk(curr_byte);
-                __PNG_POINT_NEXT_CHUNK(curr_byte, sec->data_length);
+                PNG_POINT_NEXT_CHUNK(curr_byte, sec->data_length);
                 _png_chunk* th = _load_png_chunk(curr_byte);
-                __PNG_POINT_NEXT_CHUNK(curr_byte, th->data_length);
+                PNG_POINT_NEXT_CHUNK(curr_byte, th->data_length);
                 _png_chunk* IDAT = _load_png_chunk(curr_byte);
 
                 break;
             }
             case _EXT_JPG: {
+                /*
+                    FINISH THIS
+                */
                 break;
             }
             }
         }
 
         return nullptr;
+    }
+
+    void free(byte* data) {
+        delete[] data;
     }
 
     _extension _get_extension(const char* file_path) {
