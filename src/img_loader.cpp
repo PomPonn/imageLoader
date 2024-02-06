@@ -81,6 +81,44 @@ namespace img_loader {
         return chunk;
     }
 
+    /**
+     * Trims the high byte from a byte array based on the given bit count.
+     *
+     * @param data The byte array to be trimmed.
+     * @param bit_count The number of bits per byte.
+     * @param data_size The size of the byte array.
+     * @param new_size A reference to a variable that will store the size of the trimmed byte array.
+     * @return The trimmed byte array.
+     */
+    byte* _trim_high_byte(byte* data, uint bit_count, size_t data_size, size_t& new_size) {
+        // Check if the input parameters are valid
+        if (data_size < 1 || data == nullptr || bit_count < 16 || bit_count % 8 != 0) {
+            return nullptr;
+        }
+
+        // Calculate the number of bytes per element based on the bit count
+        ushort byte_count = bit_count / 8;
+
+        // Calculate the size of the trimmed byte array
+        new_size = data_size - data_size / byte_count;
+
+        // Create a new byte array with the calculated size
+        byte* result = new byte[new_size];
+
+        // Iterate over the original byte array and copy each element to the new byte array, skipping the elements that will be removed
+        size_t result_index = 0;
+        for (size_t i = 0; i < data_size; i++) {
+            if ((i + 1) % byte_count == 0) {
+                continue;
+            }
+            result[result_index++] = data[i];
+        }
+        // Delete the original byte array
+        delete[] data;
+
+        return result;
+    }
+
     byte* _load_bitmap(std::ifstream& file, int& width, int& height) {
         byte* buffer = nullptr;
 
@@ -102,6 +140,7 @@ namespace img_loader {
 
             width = info_header.width;
             height = info_header.height;
+            size_t img_size = width * height * (info_header.bit_count / 8);
 
             // color table
             if (info_header.bit_count <= 8 && info_header.compression == 0) {
@@ -136,7 +175,15 @@ namespace img_loader {
             }
             // uncompressed data
             else if (info_header.compression == 0) {
-                buffer = _read_file_block(file, width * height * 3);
+                buffer = _read_file_block(file, img_size);
+
+                // heap error
+                if (info_header.bit_count == 32) {
+                    size_t trimmed_size = 0;
+                    buffer = _trim_high_byte(buffer, info_header.bit_count, img_size, trimmed_size);
+                }
+
+                return buffer;
             }
             else {
                 std::cerr << "IMG_LOADER::BMP::UNSUPPORTED_FILE_STRUCTURE" << std::endl;
@@ -148,9 +195,21 @@ namespace img_loader {
             buffer = _read_file_block(file, sizeof(_bmp_v5_header));
             _bmp_v5_header v5_header = *(_bmp_v5_header*)buffer;
             delete[] buffer;
+
+            width = v5_header.width;
+            height = v5_header.height;
+            size_t img_size = width * height * (v5_header.bit_count / 8);
+
             // uncompressed data
-            if (v5_header.bit_count == 24 && v5_header.compression == 0) {
-                buffer = _read_file_block(file, width * height);
+            if (v5_header.compression == 0) {
+                buffer = _read_file_block(file, img_size);
+
+                if (v5_header.bit_count == 32) {
+                    size_t trimmed_size = 0;
+                    buffer = _trim_high_byte(buffer, v5_header.bit_count, img_size, trimmed_size);
+                }
+
+                return buffer;
             }
             else {
                 //TODO: FINISH
@@ -161,8 +220,6 @@ namespace img_loader {
             std::cerr << "IMG_LOADER::BMP::UNSUPPORTED_FILE_STRUCTURE" << std::endl;
             return nullptr;
         }
-
-        return buffer;
     }
 
     byte* load(const char* file_path, int& width, int& height)

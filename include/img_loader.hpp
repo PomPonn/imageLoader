@@ -18,6 +18,12 @@ namespace img_loader {
 
     _extension _get_extension(const char* filename);
 
+    /// @brief trims high byte of every pixel
+    /// @param data pointer to the image data
+    /// @param size image data size
+    /// @return pointer to new image data
+    byte* _trim_high_byte(byte* data, uint bit_count, size_t size, size_t& new_size);
+
     // returns pointer to read memory block
     byte* _read_file_block(std::ifstream& file, std::streamsize count);
 
@@ -151,6 +157,12 @@ namespace img_loader {
     /// </BMP> ///
 
     /// <PUBLIC> ///
+
+    // TODO: implement this
+    // stores data related info like pixel format, ...
+    struct image_data_info {
+
+    };
 
     /// @brief loads given file data
     /// @param file_path path to the file
