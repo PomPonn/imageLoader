@@ -90,6 +90,45 @@ namespace img_loader {
         return chunk;
     }
 
+    void _bmp_handle_color_table(std::ifstream& file, uint colors_used, image_data& img_data) {
+        _bmp_color_table color_table;
+
+        if (colors_used == 0) {
+            color_table.size = (uint)pow(2, img_data.bit_depth);
+        }
+        else {
+            color_table.size = colors_used;
+        }
+
+        // read color table
+        byte* buffer = _read_file_block(file, color_table.size * sizeof(rgb_quad));
+        color_table.colors = (rgb_quad*)buffer;
+
+        // read compressed data (indexes of color table entries)
+        buffer = _read_file_block(file, img_data.size);
+        _bmp_decompress_with_color_table(buffer, img_data, color_table);
+        delete[] buffer;
+
+        img_data.format = F_RGB;
+        img_data.layout = CL_UBYTE;
+    }
+
+    void _bmp_set_components_info(image_data& img_data) {
+        if (img_data.bit_depth == 32) {
+            img_data.format = F_BGRA;
+        }
+        else {
+            img_data.format = F_BGR;
+        }
+
+        if (img_data.bit_depth == 16) {
+            img_data.layout = CL_USHORT_5551;
+        }
+        else {
+            img_data.layout = CL_UBYTE;
+        }
+    }
+
     void _bmp_decompress_with_color_table
     (byte* indexes, image_data& img_data, _bmp_color_table& ctable) {
         // calculate indexes count based on bit depth
@@ -105,7 +144,7 @@ namespace img_loader {
         if (indexes_per_byte == 1)
             byte_modifier = 0xFF;
         else
-            byte_modifier = indexes_per_byte == 4 ? 0xF : 0x01;
+            byte_modifier = indexes_per_byte == 2 ? 0xF : 0x01;
 
         for (uint i = 0; i < img_data.size; i++) {
             for (uint j = 0; j < indexes_per_byte; j++) {
@@ -117,7 +156,7 @@ namespace img_loader {
                 final_data[fdata_curr_pos++] = ctable.colors[curr_index].blue;
 
                 // shift the byte, so the next iteration will get next index
-                indexes[i] = indexes[i] << img_data.bit_depth;
+                indexes[i] = indexes[i] >> img_data.bit_depth;
             }
         }
 
@@ -128,11 +167,11 @@ namespace img_loader {
         byte* buffer = nullptr;
 
         // skip file header, since its unnecessary to read
-        file.seekg(14);
+        file.seekg(10);
 
-        // read header size
+        // read data offset
         buffer = _read_file_block(file, 4);
-        uint header_size = *(uint*)buffer;
+        uint data_offset = *(uint*)buffer;
         delete[] buffer;
 
         // info header
@@ -154,53 +193,16 @@ namespace img_loader {
 
             // color table
             if (info_header.bit_count <= 8 && info_header.compression == 0) {
-                _bmp_color_table color_table;
-
-                if (info_header.colors_used == 0) {
-                    color_table.size = (uint)pow(2, info_header.bit_count);
-                }
-                else {
-                    color_table.size = info_header.colors_used;
-                }
-
-                // read color table
-                buffer = _read_file_block(file, color_table.size * sizeof(rgb_quad));
-                color_table.colors = (rgb_quad*)buffer;
-
-                // read compressed data (indexes of color table entries)
-                buffer = _read_file_block(file, img_data.size);
-                _bmp_decompress_with_color_table(buffer, img_data, color_table);
-                delete[] buffer;
-
-                img_data.format = F_RGB;
-            }
-            // bit fields
-            else if (info_header.compression == 3) {
-                // read bit fields
-                buffer = _read_file_block(file, sizeof(_bmp_color_masks));
-                _bmp_color_masks color_masks = *(_bmp_color_masks*)buffer;
-                delete[] buffer;
-
-                // TODO: FINISH
-                std::cout << "{LOG} IMG_LOADER::bit fields used: "
-                    << color_masks.red << " "
-                    << color_masks.green << " "
-                    << color_masks.blue << std::endl;
+                _bmp_handle_color_table(file, info_header.colors_used, img_data);
             }
             // uncompressed data
             else if (info_header.compression == 0) {
-                buffer = _read_file_block(file, img_data.size);
+                _bmp_set_components_info(img_data);
 
-                if (info_header.bit_count == 32) {
-                    img_data.format = F_BGRA;
-                }
-                else {
-                    img_data.format = F_BGR;
-                }
-
-                img_data.array = buffer;
+                img_data.array = _read_file_block(file, img_data.size);
             }
             else {
+                // bit fields are not supported, since they are rarely used
                 std::cerr << "IMG_LOADER::BMP::UNSUPPORTED_FILE_STRUCTURE" << std::endl;
                 img_data.array = nullptr;
             }
@@ -216,21 +218,20 @@ namespace img_loader {
             img_data.size = img_data.width * img_data.height * (v5_header.bit_count / 8);
             img_data.bit_depth = v5_header.bit_count;
 
+            // color table
+            if (v5_header.bit_count <= 8 && v5_header.compression == 0) {
+                _bmp_handle_color_table(file, v5_header.colors_used, img_data);
+            }
             // uncompressed data
-            if (v5_header.compression == 0) {
-                buffer = _read_file_block(file, img_data.size);
+            else if (v5_header.compression == 0) {
+                _bmp_set_components_info(img_data);
 
-                if (v5_header.bit_count == 32) {
-                    img_data.format = F_BGRA;
-                }
-                else {
-                    img_data.format = F_BGR;
-                }
-
-                img_data.array = buffer;
+                img_data.array = _read_file_block(file, img_data.size);
             }
             else {
-                //TODO: FINISH
+                // bit fields are not supported, since they are rarely used
+                std::cerr << "IMG_LOADER::BMP::UNSUPPORTED_FILE_STRUCTURE" << std::endl;
+                img_data.array = nullptr;
             }
         }
         // old headers

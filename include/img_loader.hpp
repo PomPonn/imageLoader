@@ -148,10 +148,15 @@ namespace img_loader {
         uint red, green, blue;
     };
 
-    // alters img_data.array
-    // made for 1 - 8 bit depth
+    // alters img_data
     void _bmp_decompress_with_color_table
     (byte* indexes, image_data& img_data, _bmp_color_table& ctable);
+
+    // alters img_data
+    void _bmp_handle_color_table(std::ifstream& file, uint colors_used, image_data& img_data);
+
+    // alters img_data
+    void _bmp_set_components_info(image_data& img_data);
 
     void _load_bitmap(std::ifstream& file, image_data& img_data);
 
@@ -167,14 +172,22 @@ namespace img_loader {
         F_BGRA = 0x80E1,
     };
 
+    // contains same values as in openGL
+    enum components_layout {
+        CL_UBYTE = 0x1401,
+        CL_USHORT_5551 = 0x8034,
+    };
+
     // stores image data related info
     struct image_data {
         byte* array;
         uint width;
         uint height;
+        // actual byte size of the image
         uint size;
         uint bit_depth;
         pixel_format format;
+        components_layout layout;
 
         image_data();
 

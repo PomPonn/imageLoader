@@ -3,8 +3,7 @@
 #include <Windows.h>
 #include <iostream>
 
-#define FILE_PATH "C:/Users/gangs/OneDrive/Dokumenty/Stuff/Projects/Image_loader/temp/beach.bmp"
-#define FILE_SIZE 518400
+#define FILE_PATH "C:/Users/gangs/OneDrive/Dokumenty/Stuff/Projects/Image_loader/temp/sample.bmp"
 
 int main() {
 

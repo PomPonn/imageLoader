@@ -54,5 +54,6 @@
         "xlocnum": "cpp",
         "xloctime": "cpp",
         "xstring": "cpp"
-    }
+    },
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
 }
