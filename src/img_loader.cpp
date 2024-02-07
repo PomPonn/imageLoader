@@ -30,10 +30,19 @@ namespace img_loader {
     byte* _read_file_block(std::ifstream& file, std::streamsize count) {
         byte* buffer = new byte[count];
         file.read((char*)buffer, count);
+
         if (file.fail()) {
             return nullptr;
         }
+
         return buffer;
+    }
+
+    image_data::image_data()
+        : array(nullptr) {};
+
+    bool image_data::isValid() {
+        return array && width && height;
     }
 
     _png_chunk* _load_png_chunk(const byte* data) {
@@ -81,54 +90,49 @@ namespace img_loader {
         return chunk;
     }
 
-    /**
-     * Trims the high byte from a byte array based on the given bit count.
-     *
-     * @param data The byte array to be trimmed.
-     * @param bit_count The number of bits per byte.
-     * @param data_size The size of the byte array.
-     * @param new_size A reference to a variable that will store the size of the trimmed byte array.
-     * @return The trimmed byte array.
-     */
-    byte* _trim_high_byte(byte* data, uint bit_count, size_t data_size, size_t& new_size) {
-        // Check if the input parameters are valid
-        if (data_size < 1 || data == nullptr || bit_count < 16 || bit_count % 8 != 0) {
-            return nullptr;
-        }
+    void _bmp_decompress_with_color_table
+    (byte* indexes, image_data& img_data, _bmp_color_table& ctable) {
+        // calculate indexes count based on bit depth
+        uint indexes_count = img_data.size * (8 / img_data.bit_depth);
+        // allocate decompressed data
+        byte* final_data = new byte[indexes_count * 3];
 
-        // Calculate the number of bytes per element based on the bit count
-        ushort byte_count = bit_count / 8;
+        ushort indexes_per_byte = indexes_count / img_data.size;
 
-        // Calculate the size of the trimmed byte array
-        new_size = data_size - data_size / byte_count;
+        uint fdata_curr_pos = 0;
+        // represents part of the byte to read
+        byte byte_modifier;
+        if (indexes_per_byte == 1)
+            byte_modifier = 0xFF;
+        else
+            byte_modifier = indexes_per_byte == 4 ? 0xF : 0x01;
 
-        // Create a new byte array with the calculated size
-        byte* result = new byte[new_size];
+        for (uint i = 0; i < img_data.size; i++) {
+            for (uint j = 0; j < indexes_per_byte; j++) {
+                // get part of the byte (one index)
+                ushort curr_index = indexes[i] & byte_modifier;
 
-        // Iterate over the original byte array and copy each element to the new byte array, skipping the elements that will be removed
-        size_t result_index = 0;
-        for (size_t i = 0; i < data_size; i++) {
-            if ((i + 1) % byte_count == 0) {
-                continue;
+                final_data[fdata_curr_pos++] = ctable.colors[curr_index].red;
+                final_data[fdata_curr_pos++] = ctable.colors[curr_index].green;
+                final_data[fdata_curr_pos++] = ctable.colors[curr_index].blue;
+
+                // shift the byte, so the next iteration will get next index
+                indexes[i] = indexes[i] << img_data.bit_depth;
             }
-            result[result_index++] = data[i];
         }
-        // Delete the original byte array
-        delete[] data;
 
-        return result;
+        img_data.array = final_data;
     }
 
-    byte* _load_bitmap(std::ifstream& file, int& width, int& height) {
+    void _load_bitmap(std::ifstream& file, image_data& img_data) {
         byte* buffer = nullptr;
 
         // skip file header, since its unnecessary to read
-        file.seekg(10);
+        file.seekg(14);
 
-        // read image data offset & header size
-        buffer = _read_file_block(file, 8);
-        uint data_offset = *(uint*)buffer;
-        uint header_size = *(uint*)(buffer + 4);
+        // read header size
+        buffer = _read_file_block(file, 4);
+        uint header_size = *(uint*)buffer;
         delete[] buffer;
 
         // info header
@@ -138,9 +142,15 @@ namespace img_loader {
             _bmp_info_header info_header = *(_bmp_info_header*)buffer;
             delete[] buffer;
 
-            width = info_header.width;
-            height = info_header.height;
-            size_t img_size = width * height * (info_header.bit_count / 8);
+            img_data.width = info_header.width;
+            img_data.height = info_header.height;
+
+            if (info_header.image_size)
+                img_data.size = info_header.image_size;
+            else
+                img_data.size = info_header.width * info_header.height * (info_header.bit_count / 8);
+
+            img_data.bit_depth = info_header.bit_count;
 
             // color table
             if (info_header.bit_count <= 8 && info_header.compression == 0) {
@@ -153,12 +163,16 @@ namespace img_loader {
                     color_table.size = info_header.colors_used;
                 }
 
+                // read color table
                 buffer = _read_file_block(file, color_table.size * sizeof(rgb_quad));
                 color_table.colors = (rgb_quad*)buffer;
+
+                // read compressed data (indexes of color table entries)
+                buffer = _read_file_block(file, img_data.size);
+                _bmp_decompress_with_color_table(buffer, img_data, color_table);
                 delete[] buffer;
 
-                // TODO: FINISH
-                std::cout << "{LOG} IMG_LOADER::color table used";
+                img_data.format = F_RGB;
             }
             // bit fields
             else if (info_header.compression == 3) {
@@ -175,19 +189,20 @@ namespace img_loader {
             }
             // uncompressed data
             else if (info_header.compression == 0) {
-                buffer = _read_file_block(file, img_size);
+                buffer = _read_file_block(file, img_data.size);
 
-                // heap error
                 if (info_header.bit_count == 32) {
-                    size_t trimmed_size = 0;
-                    buffer = _trim_high_byte(buffer, info_header.bit_count, img_size, trimmed_size);
+                    img_data.format = F_BGRA;
+                }
+                else {
+                    img_data.format = F_BGR;
                 }
 
-                return buffer;
+                img_data.array = buffer;
             }
             else {
                 std::cerr << "IMG_LOADER::BMP::UNSUPPORTED_FILE_STRUCTURE" << std::endl;
-                return nullptr;
+                img_data.array = nullptr;
             }
         }
         // v5 header
@@ -196,20 +211,23 @@ namespace img_loader {
             _bmp_v5_header v5_header = *(_bmp_v5_header*)buffer;
             delete[] buffer;
 
-            width = v5_header.width;
-            height = v5_header.height;
-            size_t img_size = width * height * (v5_header.bit_count / 8);
+            img_data.width = v5_header.width;
+            img_data.height = v5_header.height;
+            img_data.size = img_data.width * img_data.height * (v5_header.bit_count / 8);
+            img_data.bit_depth = v5_header.bit_count;
 
             // uncompressed data
             if (v5_header.compression == 0) {
-                buffer = _read_file_block(file, img_size);
+                buffer = _read_file_block(file, img_data.size);
 
                 if (v5_header.bit_count == 32) {
-                    size_t trimmed_size = 0;
-                    buffer = _trim_high_byte(buffer, v5_header.bit_count, img_size, trimmed_size);
+                    img_data.format = F_BGRA;
+                }
+                else {
+                    img_data.format = F_BGR;
                 }
 
-                return buffer;
+                img_data.array = buffer;
             }
             else {
                 //TODO: FINISH
@@ -218,17 +236,18 @@ namespace img_loader {
         // old headers
         else {
             std::cerr << "IMG_LOADER::BMP::UNSUPPORTED_FILE_STRUCTURE" << std::endl;
-            return nullptr;
+            img_data.array = nullptr;
         }
     }
 
-    byte* load(const char* file_path, int& width, int& height)
+    image_data load(const char* file_path)
     {
         std::ifstream file(file_path, std::ios::binary | std::ios::in);
+        image_data img_data;
 
         if (file.fail()) {
             std::cerr << "IMG_LOADER::OPEN_FILE::FAIL: " << file_path << std::endl;
-            return nullptr;
+            return img_data;
         }
         else {
             _extension ext = _get_extension(file_path);
@@ -236,13 +255,14 @@ namespace img_loader {
             // if extension is unknown
             if (!ext) {
                 std::cerr << "IMG_LOADER::OPEN_FILE::UNKNOWN_FORMAT: " << file_path << std::endl;
-                return nullptr;
+                return img_data;
             }
 
             switch (ext)
             {
             case _EXT_BMP: {
-                return _load_bitmap(file, width, height);
+                _load_bitmap(file, img_data);
+                break;
             }
             case _EXT_PNG: {
                 byte* buffer = nullptr;
@@ -271,11 +291,11 @@ namespace img_loader {
             }
         }
 
-        return nullptr;
+        return img_data;
     }
 
-    void free(byte* data) {
-        delete[] data;
+    void free(image_data& data) {
+        delete[] data.array;
     }
 
     _extension _get_extension(const char* file_path) {

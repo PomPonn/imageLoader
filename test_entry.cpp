@@ -3,13 +3,14 @@
 #include <Windows.h>
 #include <iostream>
 
-#define FILE_PATH "C:/Users/gangs/OneDrive/Dokumenty/Stuff/Projects/Image_loader/temp/1.1-MB.bmp"
+#define FILE_PATH "C:/Users/gangs/OneDrive/Dokumenty/Stuff/Projects/Image_loader/temp/beach.bmp"
 #define FILE_SIZE 518400
 
 int main() {
 
-    int width, height;
-    img_loader::byte* data = img_loader::load(FILE_PATH, width, height);
+    img_loader::image_data data = img_loader::load(FILE_PATH);
+
+    std::cout << data.isValid();
 
     return 0;
 }

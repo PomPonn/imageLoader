@@ -7,6 +7,8 @@ namespace img_loader {
     typedef unsigned short ushort;
     typedef unsigned char byte;
 
+    struct image_data;
+
     /// <COMMON> ///
 
     enum _extension {
@@ -17,12 +19,6 @@ namespace img_loader {
     };
 
     _extension _get_extension(const char* filename);
-
-    /// @brief trims high byte of every pixel
-    /// @param data pointer to the image data
-    /// @param size image data size
-    /// @return pointer to new image data
-    byte* _trim_high_byte(byte* data, uint bit_count, size_t size, size_t& new_size);
 
     // returns pointer to read memory block
     byte* _read_file_block(std::ifstream& file, std::streamsize count);
@@ -152,28 +148,47 @@ namespace img_loader {
         uint red, green, blue;
     };
 
-    byte* _load_bitmap(std::ifstream& file, int& width, int& height);
+    // alters img_data.array
+    // made for 1 - 8 bit depth
+    void _bmp_decompress_with_color_table
+    (byte* indexes, image_data& img_data, _bmp_color_table& ctable);
+
+    void _load_bitmap(std::ifstream& file, image_data& img_data);
 
     /// </BMP> ///
 
     /// <PUBLIC> ///
 
-    // TODO: implement this
-    // stores data related info like pixel format, ...
-    struct image_data_info {
+    // contains same values as in openGL
+    enum pixel_format {
+        F_RGB = 0x1907,
+        F_RGBA = 0x1908,
+        F_BGR = 0x80E0,
+        F_BGRA = 0x80E1,
+    };
 
+    // stores image data related info
+    struct image_data {
+        byte* array;
+        uint width;
+        uint height;
+        uint size;
+        uint bit_depth;
+        pixel_format format;
+
+        image_data();
+
+        bool isValid();
     };
 
     /// @brief loads given file data
     /// @param file_path path to the file
-    /// @param width returns width of the file
-    /// @param height returns height of the file
     /// @return pointer to the image data
-    byte* load(const char* file_path, int& width, int& height);
+    image_data load(const char* file_path);
 
     /// @brief frees image memory
     /// @param data pointer to image data
-    void free(byte* data);
+    void free(image_data& data);
 
     /// </PUBLIC> ///
 };
