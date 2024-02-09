@@ -1,15 +1,18 @@
 #include "img_loader.hpp"
 
-#include <Windows.h>
 #include <iostream>
 
-#define FILE_PATH "C:/Users/gangs/OneDrive/Dokumenty/Stuff/Projects/Image_loader/temp/sample.bmp"
+#define FILE_PATH "C:/Users/gangs/OneDrive/Dokumenty/Stuff/Projects/Image_loader/temp/lena.bmp"
 
 int main() {
 
-    img_loader::image_data data = img_loader::load(FILE_PATH);
+    int width, height;
+    img_loader::pixel_info* pinfo = nullptr;
+    unsigned char* data = img_loader::load(FILE_PATH, width, height, pinfo);
 
-    std::cout << data.isValid();
+    if (img_loader::is_error()) {
+        std::cerr << img_loader::get_error_str();
+    }
 
     return 0;
 }

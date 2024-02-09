@@ -53,7 +53,13 @@
         "xlocmes": "cpp",
         "xlocnum": "cpp",
         "xloctime": "cpp",
-        "xstring": "cpp"
+        "xstring": "cpp",
+        "chrono": "cpp",
+        "forward_list": "cpp",
+        "iomanip": "cpp",
+        "optional": "cpp",
+        "sstream": "cpp",
+        "vector": "cpp"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
 }
