@@ -3,7 +3,7 @@
 #include <cmath>    // pow()
 
 namespace img_loader {
-    byte* _load_bitmap(FILE* file, int& width, int& height, pixel_info* format_info) {
+    byte* _load_bitmap(FILE* file, int& width, int& height, pixel_info* px_info) {
         // skip file header, since its unnecessary to read
         fseek(file, 14, SEEK_SET);
 
@@ -28,9 +28,9 @@ namespace img_loader {
             {
             case 0: { // uncompressed
 
-                if (format_info) {
-                    format_info->format = F_RGB;
-                    format_info->layout = CL_UBYTE;
+                if (px_info) {
+                    px_info->format = F_RGB;
+                    px_info->layout = CL_UBYTE;
                 }
 
                 // read indexes of color table entries
@@ -45,25 +45,25 @@ namespace img_loader {
                 _set_error(ERR_BMP_RLE);
                 break;
             default:
-                _set_error(ERR_BMP_STRUCT);
+                _set_error(ERR_FILE_STRUCT);
                 break;
             }
         }
         // uncompressed 8bpp+ data
         else if (info_header.compression == 0) {
-            if (format_info) {
+            if (px_info) {
                 if (info_header.bit_count == 32) {
-                    format_info->format = F_BGRA;
+                    px_info->format = F_BGRA;
                 }
                 else {
-                    format_info->format = F_BGR;
+                    px_info->format = F_BGR;
                 }
 
                 if (info_header.bit_count == 16) {
-                    format_info->layout = CL_USHORT_5551;
+                    px_info->layout = CL_USHORT_5551;
                 }
                 else {
-                    format_info->layout = CL_UBYTE;
+                    px_info->layout = CL_UBYTE;
                 }
             }
             byte* data = new byte[image_size];

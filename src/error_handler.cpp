@@ -26,7 +26,7 @@ namespace img_loader {
         case ERR_OPEN_FAIL:
             output += "Failed to load a file.";
             break;
-        case ERR_BMP_STRUCT:
+        case ERR_FILE_STRUCT:
             output += "Loaded bitmap file has unsupported structure.";
             break;
         case ERR_FILE_FORMAT:

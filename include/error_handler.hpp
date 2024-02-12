@@ -9,7 +9,7 @@ namespace img_loader {
         ERR_FILE_FORMAT,
         ERR_BMP_RLE,
         ERR_BMP_BITFIELD,
-        ERR_BMP_STRUCT,
+        ERR_FILE_STRUCT,
     };
 
     void _set_error(error_type err);

@@ -3,7 +3,7 @@
 #include "bmp.hpp"
 #include "png.hpp"
 
-#include <cstring>
+#include <string>
 
 namespace img_loader {
     byte* load(const char* file_path, int& width, int& height, pixel_info* px_info)
@@ -52,14 +52,18 @@ namespace img_loader {
         char* ptr = (char*)file_path;
 
         while (*ptr++) {}
-        while (*ptr-- != '.') {}
+        while (*ptr != '.') {
+            ptr--;
+        }
         ptr++;
 
         // now ptr contains the extension name
 
-        if (strcmp(ptr, "jpg") || strcmp(ptr, "jpeg") || strcmp(ptr, "jpe") || strcmp(ptr, "jfif")) return _EXT_JPG;
-        else if (strcmp(ptr, "png")) return _EXT_PNG;
-        else if (strcmp(ptr, "bmp") || strcmp(ptr, "dib")) return _EXT_BMP;
+        std::string ext(ptr);
+
+        if (ext == "jpg" || ext == "jpeg" || ext == "jpe" || ext == "jfif") return _EXT_JPG;
+        else if (ext == "png") return _EXT_PNG;
+        else if (ext == "bmp" || ext == "dib") return _EXT_BMP;
         else return _EXT_UNKNOWN;
     }
 };

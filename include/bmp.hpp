@@ -45,5 +45,5 @@ namespace img_loader {
     // reads color table memory pointed by file and returns its struct
     _bmp_color_table _bmp_read_color_table(FILE* file, _bmp_info_header& info_header);
 
-    byte* _load_bitmap(FILE* file, int& width, int& height, pixel_info* format_info);
+    byte* _load_bitmap(FILE* file, int& width, int& height, pixel_info* px_info);
 }

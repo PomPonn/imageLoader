@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#define FILE_PATH "C:/Users/gangs/OneDrive/Dokumenty/Stuff/Projects/Image_loader/temp/lena.bmp"
+#define FILE_PATH "C:/Users/gangs/OneDrive/Dokumenty/Stuff/Projects/Image_loader/temp/pn1.png"
 
 int main() {
 
