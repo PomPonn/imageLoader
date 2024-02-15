@@ -1,6 +1,7 @@
 #include "png.hpp"
 
 #include "indian.hpp"
+#include "inflate.hpp"
 
 #include <vector>
 
@@ -13,11 +14,11 @@ namespace img_loader {
     _png_header_chunk_data::_png_header_chunk_data(byte* data) {
         img_width = *(uint*)reverse_indianness(4, (void*)data);
         img_height = *(uint*)reverse_indianness(4, (void*)(data + 4));
-        bit_depth = *(data + 5);
-        color_type = *(data + 6);
-        compr_method = *(data + 7);
-        filter_method = *(data + 8);
-        interlace_method = *(data + 9);
+        bit_depth = *(data + 8);
+        color_type = *(data + 9);
+        compr_method = *(data + 10);
+        filter_method = *(data + 11);
+        interlace_method = *(data + 12);
     }
 
     _png_palette_chunk_data::_png_palette_chunk_data(byte* data) {
@@ -35,7 +36,6 @@ namespace img_loader {
         fread(&chunk.type, sizeof(chunk.type), 1, file);
         chunk.type = *(uint*)reverse_indianness(sizeof(chunk.type), &chunk.type);
 
-        // init buffer
         if (chunk.type) {
             byte* buffer = new byte[chunk.data_length];
             fread(buffer, sizeof(byte), chunk.data_length, file);
@@ -57,6 +57,7 @@ namespace img_loader {
             }
             case _PNG_IEND:
             default: {
+                delete[] buffer;
                 chunk.data = nullptr;
                 break;
             }
@@ -73,7 +74,7 @@ namespace img_loader {
         fseek(file, 8, SEEK_SET);
 
         _png_chunk header;
-        _png_chunk palette;
+        _png_chunk palette{};
         std::vector<_png_chunk> data_chunks;
 
         header = _png_load_chunk(file);
@@ -95,18 +96,29 @@ namespace img_loader {
                 // check whether palette chunk can appear
                 if (_HDR_CAST(header.data)->color_type != 0 && _HDR_CAST(header.data)->color_type != 4) {
                     palette = chunk;
+                    break;
                 }
-                // no palette chunk
+                // palette shouldn`t be present
                 else {
                     _set_error(ERR_FILE_STRUCT);
+
+                    delete[] header.data;
+                    delete[] chunk.data;
+
                     return nullptr;
                 }
-                break;
             }
             case _PNG_IEND:
                 _set_error(ERR_FILE_STRUCT);
+
+                delete[] header.data;
+                delete[] palette.data;
+
                 return nullptr;
+            case _PNG_IDAT:
+                break;
             default: {
+                delete[] chunk.data;
                 break;
             }
             }
@@ -115,10 +127,25 @@ namespace img_loader {
         // get all data chunks
         do {
             data_chunks.push_back(chunk);
+            byte* decoded_chunk_data = inflate::decode((byte*)chunk.data, chunk.data_length);
 
             chunk = _png_load_chunk(file);
         } while (chunk.type == _PNG_IDAT);
 
-        int w = 5;
+        data_chunks.shrink_to_fit();
+
+
+        auto w = _HDR_CAST(header.data);
+
+        while (data_chunks.size()) {
+            chunk = data_chunks.back();
+
+
+            delete[] chunk.data;
+            data_chunks.pop_back();
+        }
+
+        delete[] header.data;
+        delete[] palette.data;
     }
 }

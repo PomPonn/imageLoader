@@ -5,7 +5,7 @@
 namespace img_loader {
 
     // contains deflate decompression related tools
-    class deflate {
+    class inflate {
         struct _zlib_datastream {
             /*
             bits 0 - 3
@@ -31,11 +31,19 @@ namespace img_loader {
             */
             byte flags;
 
-            // no dictionary id here, since it will never be present
+            // no dictionary id here, since it will never be present in png
 
             /*compressed data*/
+            byte* data_blocks;
 
             uint adler32;
         };
+
+    public:
+        /// @brief decodes zlib datastream
+        /// @param compressed_data pointer to compressed data
+        /// @param data_size size of compressed data
+        /// @return pointer to uncompressed data
+        static byte* decode(const byte* compressed_data, uint data_size);
     };
 }
