@@ -7,7 +7,8 @@ src/indian.hpp
 src/bmp.cpp
 src/png.cpp
 src/error_handler.cpp
-src/inflate.cpp)
+src/inflate.cpp
+src/huffman.cpp)
 
 target_include_directories(img_loader PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
