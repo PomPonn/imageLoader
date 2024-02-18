@@ -2,6 +2,7 @@
 
 #include "bmp.hpp"
 #include "png.hpp"
+#include "jpg.hpp"
 
 #include <string>
 
@@ -33,15 +34,13 @@ namespace img_loader {
                 return _load_png_file(file, width, height, px_info);
             }
             case _EXT_JPG: {
-                /*
-                    FINISH THIS
-                */
-                break;
+                return _load_jpeg_file(file, width, height, px_info);
+            }
+            default: {
+                return nullptr;
             }
             }
         }
-
-        return nullptr;
     }
 
     void free(byte* data) {
