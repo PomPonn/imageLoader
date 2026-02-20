@@ -1,15 +1,15 @@
-cmake_minimum_required(VERSION 3.8.0)
+cmake_minimum_required(VERSION 3.11.0)
 project(img_loader VERSION 0.1.0 LANGUAGES C CXX)
 
 add_library(img_loader STATIC src/img_loader.cpp)
 target_sources(img_loader PRIVATE
-src/indian.hpp
-src/bmp.cpp
-src/png.cpp
-src/error_handler.cpp
-src/inflate.cpp
-src/huffman.cpp
-src/jpg.cpp)
+    src/indian.hpp
+    src/bmp.cpp
+    src/png.cpp
+    src/error_handler.cpp
+    src/inflate.cpp
+    src/huffman.cpp
+    src/jpg.cpp)
 
 target_include_directories(img_loader PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
