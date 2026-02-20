@@ -1,2 +1,2 @@
 # imageLoader
-load png, jpeg and bmp images from c++ code
+Currently only bitmap loading works
